@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.log
+
+## Rider / Resharper
+.idea/
+*.DotSettings.user
+
+## VS Code
+.vscode/
+
+## Build output
+publish/
