@@ -1,4 +1,5 @@
 using System.Net.NetworkInformation;
+using LANManager.Models;
 
 namespace LANManager.Services;
 
@@ -7,19 +8,28 @@ public class NetworkSpeedSample
     public DateTime Time { get; set; }
     public double UploadBps { get; set; }
     public double DownloadBps { get; set; }
+    // Smoothed values (rolling average)
+    public double SmoothedUploadBps { get; set; }
+    public double SmoothedDownloadBps { get; set; }
 }
 
 public class NetworkSpeedService : IDisposable
 {
-    private readonly System.Threading.Timer _timer;
+    private System.Threading.Timer? _timer;
     private long _lastBytesSent;
     private long _lastBytesReceived;
     private DateTime _lastSampleTime;
 
+    private readonly Queue<double> _uploadHistory = new();
+    private readonly Queue<double> _downloadHistory = new();
+
+    private AppSettings _settings;
+
     public event Action<NetworkSpeedSample>? SampleReady;
 
-    public NetworkSpeedService()
+    public NetworkSpeedService(AppSettings settings)
     {
+        _settings = settings;
         var iface = GetPrimaryInterface();
         if (iface != null)
         {
@@ -28,7 +38,20 @@ public class NetworkSpeedService : IDisposable
             _lastBytesReceived = stats.BytesReceived;
         }
         _lastSampleTime = DateTime.UtcNow;
-        _timer = new System.Threading.Timer(Sample, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        StartTimer();
+    }
+
+    private void StartTimer()
+    {
+        _timer?.Dispose();
+        var interval = TimeSpan.FromSeconds(Math.Max(1, _settings.PollIntervalSeconds));
+        _timer = new System.Threading.Timer(Sample, null, interval, interval);
+    }
+
+    public void ApplySettings(AppSettings settings)
+    {
+        _settings = settings;
+        StartTimer();
     }
 
     private void Sample(object? _)
@@ -39,19 +62,29 @@ public class NetworkSpeedService : IDisposable
         var stats = iface.GetIPStatistics();
         var now = DateTime.UtcNow;
         var elapsed = (now - _lastSampleTime).TotalSeconds;
+        if (elapsed <= 0) return;
 
-        var upload = (stats.BytesSent - _lastBytesSent) / elapsed;
-        var download = (stats.BytesReceived - _lastBytesReceived) / elapsed;
+        var rawUp = Math.Max(0, (stats.BytesSent - _lastBytesSent) / elapsed);
+        var rawDown = Math.Max(0, (stats.BytesReceived - _lastBytesReceived) / elapsed);
 
         _lastBytesSent = stats.BytesSent;
         _lastBytesReceived = stats.BytesReceived;
         _lastSampleTime = now;
 
+        // Rolling average
+        int window = Math.Max(1, _settings.SmoothingWindowSamples);
+        _uploadHistory.Enqueue(rawUp);
+        _downloadHistory.Enqueue(rawDown);
+        while (_uploadHistory.Count > window) _uploadHistory.Dequeue();
+        while (_downloadHistory.Count > window) _downloadHistory.Dequeue();
+
         SampleReady?.Invoke(new NetworkSpeedSample
         {
             Time = now,
-            UploadBps = Math.Max(0, upload),
-            DownloadBps = Math.Max(0, download)
+            UploadBps = rawUp,
+            DownloadBps = rawDown,
+            SmoothedUploadBps = _uploadHistory.Average(),
+            SmoothedDownloadBps = _downloadHistory.Average()
         });
     }
 
@@ -63,5 +96,5 @@ public class NetworkSpeedService : IDisposable
             .OrderByDescending(n => n.GetIPStatistics().BytesReceived)
             .FirstOrDefault();
 
-    public void Dispose() => _timer.Dispose();
+    public void Dispose() => _timer?.Dispose();
 }

@@ -15,14 +15,18 @@ public partial class MainWindow : Window
     private readonly SpeedViewModel _vm;
     private int _scanProgress;
 
-    public MainWindow()
+    public MainWindow(NetworkSpeedService speedService, AppSettings settings)
     {
         InitializeComponent();
 
-        _speedService = new NetworkSpeedService();
+        _speedService = speedService;
         _procService = new ProcessBandwidthService(_speedService);
         _lanScanner = new LanScannerService();
         _alertService = new AlertService();
+
+        // Load persisted alerts
+        foreach (var a in settings.Alerts) _alertService.AddAlert(a);
+        AlertGrid.ItemsSource = _alertService.Alerts;
 
         _vm = new SpeedViewModel();
         DataContext = _vm;
@@ -33,13 +37,19 @@ public partial class MainWindow : Window
         _alertService.AlertTriggered += OnAlertTriggered;
     }
 
+    public void ApplySettings(AppSettings settings)
+    {
+        // Settings are applied at the service level; nothing extra needed here yet
+    }
+
     private void OnSpeedSample(NetworkSpeedSample s)
     {
         Dispatcher.Invoke(() =>
         {
             _vm.AddSample(s);
-            UploadLabel.Text = FormatBps(s.UploadBps);
-            DownloadLabel.Text = FormatBps(s.DownloadBps);
+            // Show smoothed values in the big labels
+            UploadLabel.Text = FormatBps(s.SmoothedUploadBps);
+            DownloadLabel.Text = FormatBps(s.SmoothedDownloadBps);
         });
     }
 
@@ -122,7 +132,6 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _speedService.Dispose();
         _procService.Dispose();
         base.OnClosed(e);
     }

@@ -70,8 +70,8 @@ public class SpeedViewModel
 
     public void AddSample(NetworkSpeedSample s)
     {
-        _uploadPoints.Add(new ObservablePoint(_tick, s.UploadBps));
-        _downloadPoints.Add(new ObservablePoint(_tick, s.DownloadBps));
+        _uploadPoints.Add(new ObservablePoint(_tick, s.SmoothedUploadBps));
+        _downloadPoints.Add(new ObservablePoint(_tick, s.SmoothedDownloadBps));
         _tick++;
 
         while (_uploadPoints.Count > MaxPoints) _uploadPoints.RemoveAt(0);
