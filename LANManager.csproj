@@ -9,6 +9,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>LANManager</AssemblyName>
     <RootNamespace>LANManager</RootNamespace>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
