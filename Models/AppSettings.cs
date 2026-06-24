@@ -6,7 +6,7 @@ namespace LANManager.Models;
 public class AppSettings
 {
     public int PollIntervalSeconds { get; set; } = 1;
-    public int SmoothingWindowSamples { get; set; } = 4;
+    public int SmoothingWindowSamples { get; set; } = 1;
     public TrayDisplayMode TrayDisplay { get; set; } = TrayDisplayMode.Numeric;
     public string SpeedUnit { get; set; } = "Auto"; // Auto, KB/s, MB/s
     public List<BandwidthAlert> Alerts { get; set; } = new();

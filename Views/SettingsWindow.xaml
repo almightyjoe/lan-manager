@@ -69,7 +69,7 @@
             </Grid>
 
             <!-- Smoothing window -->
-            <Label Content="Smoothing Window (samples to average)"/>
+            <Label Content="Smoothing Window (1 = raw, 2–10 = average over N samples)"/>
             <Grid Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -85,7 +85,7 @@
             <!-- Smoothing explanation -->
             <Border Background="#252535" CornerRadius="6" Padding="10,8" Margin="0,0,0,20">
                 <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#64748B"
-                    Text="Smoothing averages the last N samples. 1 = raw (jumpy). 4 = recommended. 10 = very smooth but slow to react. Poll interval only affects CPU scheduling — 1s is already extremely light."/>
+                    Text="1 = raw mode, no smoothing (default). 2–10 = rolling average over N samples — higher values are smoother but slower to react to sudden bursts. Poll interval is a lightweight kernel counter read, not packet capture — 1s adds essentially zero CPU or network load."/>
             </Border>
 
             <!-- Buttons -->
