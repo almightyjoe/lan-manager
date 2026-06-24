@@ -10,6 +10,7 @@ public partial class App : System.Windows.Application
 {
     private NotifyIcon? _trayIcon;
     private MainWindow? _mainWindow;
+    private FlyoutWindow? _flyout;
     private NetworkSpeedService? _speedService;
     private TrayIconService? _trayIconService;
     private AppSettings _settings = AppSettings.Load();
@@ -22,6 +23,7 @@ public partial class App : System.Windows.Application
         _trayIconService = new TrayIconService();
         _speedService = new NetworkSpeedService(_settings);
         _mainWindow = new MainWindow(_speedService, _settings);
+        _flyout = new FlyoutWindow();
 
         _trayIcon = new NotifyIcon
         {
@@ -31,29 +33,48 @@ public partial class App : System.Windows.Application
             ContextMenuStrip = BuildContextMenu()
         };
 
-        _trayIcon.DoubleClick += (_, _) => ShowWindow();
+        // Single click → flyout toggle
+        _trayIcon.Click += (s, ev) =>
+        {
+            if (ev is MouseEventArgs me && me.Button == MouseButtons.Left)
+                ToggleFlyout();
+        };
+
+        // Double click → main window
+        _trayIcon.DoubleClick += (_, _) => ShowMainWindow();
+
         _speedService.SampleReady += OnSpeedSample;
+    }
+
+    private void ToggleFlyout()
+    {
+        if (_flyout == null) return;
+        if (_flyout.IsVisible)
+            _flyout.Hide();
+        else
+            _flyout.ShowNearTray();
     }
 
     private void OnSpeedSample(NetworkSpeedSample s)
     {
         if (_trayIcon == null || _trayIconService == null) return;
 
-        var icon = _settings.TrayDisplay == TrayDisplayMode.Sparkline
-            ? _trayIconService.GenerateSparkline(s.SmoothedDownloadBps)
-            : _trayIconService.GenerateNumeric(s.SmoothedDownloadBps, s.SmoothedUploadBps);
+        // Update tray icon color tier
+        _trayIcon.Icon = _trayIconService.GetActivityIcon(s.DownloadBps);
 
-        _trayIcon.Icon = icon;
+        // Tooltip shows exact current speeds
+        var (dl, dlU) = FormatFull(s.DownloadBps);
+        var (ul, ulU) = FormatFull(s.UploadBps);
+        _trayIcon.Text = $"LAN Manager\n↓ {dl} {dlU}  ↑ {ul} {ulU}";
 
-        var (dl, dlUnit) = FormatFull(s.SmoothedDownloadBps);
-        var (ul, ulUnit) = FormatFull(s.SmoothedUploadBps);
-        _trayIcon.Text = $"↓ {dl} {dlUnit}  ↑ {ul} {ulUnit}";
+        // Push to flyout (updates even when hidden so graph is current when opened)
+        _flyout?.PushSample(s);
     }
 
     private ContextMenuStrip BuildContextMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Open LAN Manager", null, (_, _) => ShowWindow());
+        menu.Items.Add("Open LAN Manager", null, (_, _) => ShowMainWindow());
         menu.Items.Add("Settings", null, (_, _) => OpenSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
@@ -71,9 +92,10 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private void ShowWindow()
+    private void ShowMainWindow()
     {
         if (_mainWindow == null) return;
+        _flyout?.Hide();
         _mainWindow.Show();
         _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
@@ -84,6 +106,7 @@ public partial class App : System.Windows.Application
         _trayIcon?.Dispose();
         _trayIconService?.Dispose();
         _speedService?.Dispose();
+        _flyout?.Close();
         _mainWindow?.Close();
         Shutdown();
     }
@@ -91,7 +114,7 @@ public partial class App : System.Windows.Application
     private static (string value, string unit) FormatFull(double bps) => bps switch
     {
         >= 1_000_000 => ($"{bps / 1_000_000:F1}", "MB/s"),
-        >= 1_000 => ($"{bps / 1_000:F1}", "KB/s"),
-        _ => ($"{bps:F0}", "B/s")
+        >= 1_000     => ($"{bps / 1_000:F1}", "KB/s"),
+        _            => ($"{bps:F0}", "B/s")
     };
 }

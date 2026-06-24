@@ -17,7 +17,6 @@ public partial class SettingsWindow : Window
 
     private void LoadValues()
     {
-        TrayModeCombo.SelectedIndex = _settings.TrayDisplay == TrayDisplayMode.Sparkline ? 1 : 0;
         PollSlider.Value = _settings.PollIntervalSeconds;
         SmoothSlider.Value = _settings.SmoothingWindowSamples;
         UpdateLabels();
@@ -34,9 +33,6 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        _settings.TrayDisplay = TrayModeCombo.SelectedIndex == 1
-            ? TrayDisplayMode.Sparkline
-            : TrayDisplayMode.Numeric;
         _settings.PollIntervalSeconds = (int)PollSlider.Value;
         _settings.SmoothingWindowSamples = (int)SmoothSlider.Value;
         _settings.Save();

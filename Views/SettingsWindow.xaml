@@ -1,7 +1,7 @@
 <Window x:Class="LANManager.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="LAN Manager — Settings" Height="380" Width="440"
+        Title="LAN Manager — Settings" Height="310" Width="440"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#1E1E2E" Foreground="#F8FAFC">
@@ -46,13 +46,6 @@
         <StackPanel>
             <TextBlock Text="Settings" FontSize="18" FontWeight="Bold"
                        Foreground="#A78BFA" Margin="0,0,0,20"/>
-
-            <!-- Tray display mode -->
-            <Label Content="Tray Icon Display"/>
-            <ComboBox x:Name="TrayModeCombo" Margin="0,0,0,16">
-                <ComboBoxItem Content="Numeric (speed as text)" Tag="Numeric"/>
-                <ComboBoxItem Content="Sparkline (mini graph)" Tag="Sparkline"/>
-            </ComboBox>
 
             <!-- Poll interval -->
             <Label Content="Poll Interval"/>

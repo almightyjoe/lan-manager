@@ -1,0 +1,57 @@
+<Window x:Class="LANManager.Views.FlyoutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+        Width="280" Height="180"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent" Topmost="True"
+        ShowInTaskbar="False" ResizeMode="NoResize"
+        Deactivated="Window_Deactivated">
+
+    <Border Background="#1E1E2E" CornerRadius="10"
+            BorderBrush="#3F3F5F" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.6" Color="Black"/>
+        </Border.Effect>
+
+        <Grid Margin="14,12,14,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Speed readout -->
+            <Grid Grid.Row="0" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="↓ DOWN" FontSize="9" FontWeight="Bold"
+                               Foreground="#22C55E" Opacity="0.8"/>
+                    <TextBlock x:Name="DownloadLabel" Text="0 KB/s"
+                               FontSize="20" FontWeight="Bold" Foreground="#22C55E"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <TextBlock Text="↑ UP" FontSize="9" FontWeight="Bold"
+                               Foreground="#A78BFA" Opacity="0.8" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="UploadLabel" Text="0 KB/s"
+                               FontSize="20" FontWeight="Bold" Foreground="#A78BFA"
+                               HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Mini chart -->
+            <Border Grid.Row="1" CornerRadius="6" Background="#252535" Padding="2">
+                <lvc:CartesianChart x:Name="MiniChart"
+                                    Series="{Binding SpeedSeries}"
+                                    XAxes="{Binding XAxes}"
+                                    YAxes="{Binding YAxes}"
+                                    TooltipPosition="Hidden"
+                                    LegendPosition="Hidden"/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
