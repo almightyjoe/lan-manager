@@ -1,0 +1,15 @@
+[Unit]
+Description=LAN Monitor passive capture
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/joe/claudework/lanman
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/joe/claudework/lanman/capture.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

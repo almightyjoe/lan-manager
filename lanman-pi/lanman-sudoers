@@ -1,0 +1,3 @@
+# Allow the lanman dashboard (running as joe) to control the capture service
+# Install with: sudo install -m 0440 lanman-sudoers /etc/sudoers.d/lanman
+joe ALL=(ALL) NOPASSWD: /bin/systemctl start lanman-capture, /bin/systemctl stop lanman-capture, /bin/systemctl restart lanman-capture
