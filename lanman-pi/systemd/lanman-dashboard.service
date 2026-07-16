@@ -1,0 +1,18 @@
+[Unit]
+Description=LAN Monitor dashboard
+After=network-online.target lanman-capture.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joe
+Group=joe
+WorkingDirectory=/home/joe/claudework/lanman
+Environment=LANMAN_PORT=3099
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/joe/claudework/lanman/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

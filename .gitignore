@@ -15,3 +15,12 @@ obj/
 
 ## Build output
 publish/
+
+## Pi dashboard — runtime files
+lanman-pi/traffic.db
+lanman-pi/traffic.db-shm
+lanman-pi/traffic.db-wal
+lanman-pi/target.conf
+lanman-pi/security_snapshot*.json
+lanman-pi/__pycache__/
+*.pyc

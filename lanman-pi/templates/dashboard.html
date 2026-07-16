@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LAN Monitor — {{ target_ip }}</title>
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --accent:   #0dcaf0;
+      --danger:   #dc3545;
+      --success:  #20c997;
+      --warning:  #ffc107;
+      --muted:    #6c757d;
+      --card-bg:  #1a1d23;
+      --row-alt:  #212529;
+    }
+    body { background: #111316; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* ── Header ── */
+    .topbar {
+      background: #0d1117;
+      border-bottom: 1px solid #2d3748;
+      padding: .75rem 1.5rem;
+      display: flex; align-items: center; gap: 1.5rem;
+    }
+    .topbar .target-badge {
+      font-size: .85rem; color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 6px; padding: .2rem .7rem;
+      letter-spacing: .04em;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--muted); display: inline-block;
+      transition: background .4s;
+    }
+    .status-dot.live { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status-dot.stale { background: var(--warning); }
+    .status-dot.offline { background: var(--danger); }
+
+    /* ── Stat Cards ── */
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.1rem 1.4rem;
+    }
+    .stat-card .label { font-size: .72rem; text-transform: uppercase;
+                         letter-spacing: .07em; color: var(--muted); }
+    .stat-card .value { font-size: 1.7rem; font-weight: 600; line-height: 1.15; }
+    .stat-card .sub   { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+
+    /* ── Charts ── */
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+    }
+    .chart-card h6 { font-size: .8rem; text-transform: uppercase;
+                      letter-spacing: .07em; color: var(--muted); margin-bottom: .8rem; }
+
+    /* ── Events Table ── */
+    .events-card {
+      background: var(--card-bg);
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .events-card .card-header {
+      background: #0d1117;
+      border-bottom: 1px solid #2d3748;
+      padding: .7rem 1.1rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .events-table { font-size: .78rem; margin: 0; }
+    .events-table th {
+      background: #161b22;
+      font-size: .68rem; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--muted);
+      padding: .45rem .8rem; white-space: nowrap;
+      position: sticky; top: 0; z-index: 1;
+    }
+    .events-table td { padding: .35rem .8rem; vertical-align: middle;
+                        white-space: nowrap; border-color: #2d3748; }
+    .events-table tr:hover td { background: rgba(255,255,255,.04); }
+    .events-table tr.alert-row td { background: rgba(220,53,69,.08); }
+    .events-table tr.alert-row:hover td { background: rgba(220,53,69,.15); }
+
+    .dir-out { color: #20c997; }
+    .dir-in  { color: #0dcaf0; }
+    .proto-tcp  { color: #a78bfa; }
+    .proto-udp  { color: #60a5fa; }
+    .proto-icmp { color: #fbbf24; }
+    .proto-dns  { color: #34d399; }
+    .proto-other { color: var(--muted); }
+
+    .flag-pill {
+      font-size: .65rem; background: #2d3748;
+      border-radius: 4px; padding: .1rem .35rem;
+      font-family: monospace; color: #94a3b8;
+    }
+    .alert-badge {
+      font-size: .65rem; color: var(--danger);
+      border: 1px solid var(--danger);
+      border-radius: 4px; padding: .1rem .35rem;
+    }
+    .port-label { color: var(--muted); font-size: .7rem; }
+
+    /* ── Top IPs table ── */
+    .top-ip-bar {
+      height: 6px; border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), #6366f1);
+      transition: width .4s;
+    }
+
+    .mini-pill {
+      display: inline-block;
+      font-size: .64rem;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: .05rem .3rem;
+      margin: 0 .15rem .15rem 0;
+      background: #111827;
+    }
+    .mono-small { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .74rem; }
+
+    /* ── Scrollable table container ── */
+    .table-scroll { max-height: 420px; overflow-y: auto; }
+
+    /* ── Misc ── */
+    .section-title {
+      font-size: .72rem; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted);
+      margin-bottom: .6rem;
+    }
+    .refresh-indicator { font-size: .7rem; color: var(--muted); }
+    .filter-btn { font-size: .75rem; }
+    a, a:hover { color: inherit; text-decoration: none; }
+
+    /* fade-in animation for new rows */
+    @keyframes fadeInRow { from { background: rgba(13,202,240,.15); } to {} }
+    .new-row td { animation: fadeInRow 1.5s ease-out; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ TOP BAR ═══════════════════ -->
+<div class="topbar">
+  <span><i class="bi bi-broadcast me-1" style="color:var(--accent)"></i>
+        <strong>LAN Monitor</strong></span>
+  <span class="target-badge" id="target-ip-badge"><i class="bi bi-hdd-network me-1"></i>{{ target_ip }}</span>
+  <span class="target-badge" id="target-mac"><i class="bi bi-fingerprint me-1"></i>MAC learning</span>
+  <span id="status-wrap">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text" class="ms-2 text-muted" style="font-size:.8rem">connecting…</span>
+  </span>
+  <span class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+    <span class="refresh-indicator">auto-refresh <span id="countdown">5</span>s</span>
+    <button class="btn btn-sm btn-outline-secondary" id="pause-btn" style="font-size:.7rem;padding:.1rem .5rem">
+      <i class="bi bi-pause-fill"></i>
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" id="clear-target-btn"
+            onclick="clearTarget()" style="font-size:.7rem;padding:.1rem .5rem;display:none"
+            title="Stop monitoring any specific device">
+      <i class="bi bi-x-circle"></i> Clear Target
+    </button>
+    <span class="text-muted" style="font-size:.75rem;border-left:1px solid #2d3748;padding-left:.75rem">capture:</span>
+    <button class="btn btn-sm btn-outline-success" id="capture-start-btn"
+            onclick="captureControl('start')" style="font-size:.7rem;padding:.1rem .5rem;display:none">
+      <i class="bi bi-play-fill"></i> Start
+    </button>
+    <button class="btn btn-sm btn-outline-danger" id="capture-stop-btn"
+            onclick="captureControl('stop')" style="font-size:.7rem;padding:.1rem .5rem;display:none">
+      <i class="bi bi-stop-fill"></i> Stop
+    </button>
+    <button class="btn btn-sm btn-outline-warning" id="capture-restart-btn"
+            onclick="captureControl('restart')" style="font-size:.7rem;padding:.1rem .5rem;display:none"
+            title="Restart capture">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+    <span id="capture-svc-badge" style="font-size:.68rem;padding:.15rem .4rem;border-radius:4px;border:1px solid #2d3748;display:none"></span>
+  </span>
+</div>
+
+<div class="container-fluid px-3 py-3" style="max-width:1600px">
+
+  <!-- ═══════════════════ STAT CARDS ═══════════════════ -->
+  <div class="row g-2 mb-3" id="stats-row">
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label">Packets Today</div>
+        <div class="value" id="s-pkts">—</div>
+        <div class="sub" id="s-pkts-all">all time: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-arrow-up-short text-success"></i> Out Today</div>
+        <div class="value text-success" id="s-out">—</div>
+        <div class="sub" id="s-out-all">all time: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-arrow-down-short text-info"></i> In Today</div>
+        <div class="value text-info" id="s-in">—</div>
+        <div class="sub" id="s-in-all">all time: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label">Unique Remote IPs</div>
+        <div class="value" id="s-ips">—</div>
+        <div class="sub">last 24 h</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label"><i class="bi bi-exclamation-triangle text-danger"></i> Alerts Today</div>
+        <div class="value text-danger" id="s-alerts">—</div>
+        <div class="sub">flagged events</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="stat-card">
+        <div class="label">Last Updated</div>
+        <div class="value" id="s-updated" style="font-size:1.1rem">—</div>
+        <div class="sub" id="s-db-age"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ BEHAVIOR SUMMARY ═══════════════════ -->
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="stat-card">
+        <div class="label">Identity</div>
+        <div class="value" id="b-identity" style="font-size:1rem">—</div>
+        <div class="sub" id="b-interface">interface: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card">
+        <div class="label">Fan-out (24 h)</div>
+        <div class="value" id="b-fanout">—</div>
+        <div class="sub" id="b-ports">remote ports: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card">
+        <div class="label">Busiest Hour</div>
+        <div class="value" id="b-hour" style="font-size:1.25rem">—</div>
+        <div class="sub" id="b-hour-sub">packets: —</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card">
+        <div class="label">Last Event</div>
+        <div class="value" id="b-last" style="font-size:1.05rem">—</div>
+        <div class="sub">passive metadata only</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ LAN INVENTORY ═══════════════════ -->
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-xl-4">
+      <div class="events-card h-100">
+        <div class="card-header">
+          <span style="font-size:.8rem;font-weight:600">
+            <i class="bi bi-diagram-3 me-1" style="color:var(--accent)"></i>
+            LAN Inventory
+          </span>
+          <button class="btn btn-sm btn-outline-secondary filter-btn" onclick="fetchLanInventory(true)">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+        <div class="p-3">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="stat-card">
+                <div class="label">Devices</div>
+                <div class="value" id="lan-devices">—</div>
+                <div class="sub" id="lan-named">named: —</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card">
+                <div class="label">Services</div>
+                <div class="value" id="lan-services">—</div>
+                <div class="sub" id="lan-macs">MACs: —</div>
+              </div>
+            </div>
+          </div>
+          <div class="section-title mt-3">Observer</div>
+          <div id="lan-local" class="mono-small text-muted">—</div>
+          <div class="text-muted mt-1" style="font-size:.72rem" id="lan-observer-note"></div>
+          <div class="section-title mt-3">Scan Scope</div>
+          <div id="lan-scope" class="mono-small text-muted">—</div>
+          <div class="sub mt-3 text-muted" id="lan-note" style="font-size:.72rem"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-8">
+      <div class="events-card">
+        <div class="card-header">
+          <span style="font-size:.8rem;font-weight:600">
+            <i class="bi bi-hdd-network me-1" style="color:var(--accent)"></i>
+            Discovered Devices
+            <span class="text-muted" id="lan-scanned" style="font-size:.7rem"></span>
+          </span>
+        </div>
+        <div class="table-scroll" style="max-height:300px">
+          <table class="table table-borderless events-table">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th>Name</th>
+                <th>MAC / Vendor</th>
+                <th>Evidence</th>
+                <th>Open Services</th>
+                <th>Target</th>
+              </tr>
+            </thead>
+            <tbody id="lan-tbody">
+              <tr><td colspan="6" class="text-center text-muted py-4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TARGET SECURITY SNAPSHOT ═══════════════════ -->
+  <div class="row g-2 mb-3">
+    <div class="col-12">
+      <div class="events-card">
+        <div class="card-header">
+          <span style="font-size:.8rem;font-weight:600">
+            <i class="bi bi-shield-check me-1" style="color:var(--accent)"></i>
+            Target Security Snapshot
+            <span class="text-muted" id="sec-scanned" style="font-size:.7rem"></span>
+          </span>
+          <button class="btn btn-sm btn-outline-warning filter-btn" onclick="fetchSecuritySnapshot(true)">
+            <i class="bi bi-search"></i> Run snapshot
+          </button>
+        </div>
+        <div class="p-3">
+          <div class="row g-2">
+            <div class="col-12 col-lg-4">
+              <div class="stat-card h-100">
+                <div class="label">Mode</div>
+                <div class="value" id="sec-mode" style="font-size:1rem">—</div>
+                <div class="sub" id="sec-summary">Manual, cached active check</div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-8">
+              <div class="table-scroll" style="max-height:150px">
+                <table class="table table-borderless events-table">
+                  <thead>
+                    <tr>
+                      <th>Port</th>
+                      <th>State</th>
+                      <th>Service</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sec-tbody">
+                    <tr><td colspan="4" class="text-center text-muted py-3">No snapshot yet</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="text-muted mt-2" style="font-size:.72rem" id="sec-command"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ CHARTS ROW ═══════════════════ -->
+  <div class="row g-2 mb-3">
+    <!-- Hourly traffic -->
+    <div class="col-12 col-xl-4">
+      <div class="chart-card" style="height:230px">
+        <h6><i class="bi bi-graph-up me-1"></i>Hourly Traffic (bytes)</h6>
+        <canvas id="hourlyChart" style="max-height:175px"></canvas>
+      </div>
+    </div>
+    <!-- Daily traffic -->
+    <div class="col-12 col-xl-4">
+      <div class="chart-card" style="height:230px">
+        <h6><i class="bi bi-calendar3 me-1"></i>Daily History (30 d)</h6>
+        <canvas id="dailyChart" style="max-height:175px"></canvas>
+      </div>
+    </div>
+    <!-- Protocol distribution -->
+    <div class="col-6 col-xl-2">
+      <div class="chart-card" style="height:230px">
+        <h6><i class="bi bi-pie-chart me-1"></i>Protocols (24 h)</h6>
+        <canvas id="protoChart" style="max-height:175px"></canvas>
+      </div>
+    </div>
+    <!-- Top ports -->
+    <div class="col-6 col-xl-2">
+      <div class="chart-card" style="height:230px">
+        <h6><i class="bi bi-list-ol me-1"></i>Top Ports (24 h)</h6>
+        <canvas id="portsChart" style="max-height:175px"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ BOTTOM ROW ═══════════════════ -->
+  <div class="row g-2">
+
+    <!-- Live events feed -->
+    <div class="col-12 col-xl-8">
+      <div class="events-card">
+        <div class="card-header">
+          <span style="font-size:.8rem;font-weight:600">
+            <i class="bi bi-activity me-1" style="color:var(--accent)"></i>
+            Live Events
+          </span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary filter-btn active" id="filter-all"
+                    onclick="setFilter('all', this)">All</button>
+            <button class="btn btn-sm btn-outline-success filter-btn" id="filter-out"
+                    onclick="setFilter('out', this)">
+              <i class="bi bi-arrow-up-short"></i> Out
+            </button>
+            <button class="btn btn-sm btn-outline-info filter-btn" id="filter-in"
+                    onclick="setFilter('in', this)">
+              <i class="bi bi-arrow-down-short"></i> In
+            </button>
+            <button class="btn btn-sm btn-outline-danger filter-btn" id="filter-alerts"
+                    onclick="setFilter('alerts', this)">
+              <i class="bi bi-exclamation-triangle"></i> Alerts
+            </button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="table table-borderless events-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Dir</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Proto</th>
+                <th>Size</th>
+                <th>Flags</th>
+                <th>Alert</th>
+              </tr>
+            </thead>
+            <tbody id="events-tbody">
+              <tr><td colspan="8" class="text-center text-muted py-4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top remote IPs -->
+    <div class="col-12 col-xl-4">
+      <div class="events-card h-100">
+        <div class="card-header">
+          <span style="font-size:.8rem;font-weight:600">
+            <i class="bi bi-globe2 me-1" style="color:var(--accent)"></i>
+            Top Remote IPs <span class="text-muted" style="font-size:.7rem">(24 h)</span>
+          </span>
+        </div>
+        <div class="table-scroll">
+          <table class="table table-borderless events-table">
+            <thead>
+              <tr>
+                <th>IP</th>
+                <th>Conns</th>
+                <th>Out</th>
+                <th>In</th>
+                <th style="width:80px"></th>
+              </tr>
+            </thead>
+            <tbody id="topip-tbody">
+              <tr><td colspan="5" class="text-center text-muted py-4">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /container -->
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+let TARGET_IP = "{{ target_ip }}";
+const DEFAULT_TARGET_IP = "{{ default_target_ip }}";
+let paused        = false;
+let countdown     = 5;
+let activeFilter  = 'all';
+let lastEventId   = 0;
+let lastLanFetchMs = 0;
+let hourlyChart, dailyChart, protoChart, portsChart;
+
+// ── Init Charts ──────────────────────────────────────────────────────────────
+function initCharts() {
+  const gridColor = 'rgba(255,255,255,.06)';
+  const tickColor = '#6c757d';
+
+  // Hourly traffic
+  hourlyChart = new Chart(document.getElementById('hourlyChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Out', data: [], borderColor: '#20c997', backgroundColor: 'rgba(32,201,151,.12)',
+          tension: .35, fill: true, pointRadius: 2 },
+        { label: 'In',  data: [], borderColor: '#0dcaf0', backgroundColor: 'rgba(13,202,240,.12)',
+          tension: .35, fill: true, pointRadius: 2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { color: tickColor, font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, maxRotation: 45, font: { size: 10 } } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 },
+             callback: v => fmtBytes(v) } }
+      }
+    }
+  });
+
+  // Daily traffic
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Out', data: [], backgroundColor: '#20c997', borderRadius: 4 },
+        { label: 'In',  data: [], backgroundColor: '#0dcaf0', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { color: tickColor, font: { size: 11 } } } },
+      scales: {
+        x: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 } } },
+        y: { stacked: true, grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 },
+             callback: v => fmtBytes(v) } }
+      }
+    }
+  });
+
+  // Protocol doughnut
+  protoChart = new Chart(document.getElementById('protoChart'), {
+    type: 'doughnut',
+    data: {
+      labels: [],
+      datasets: [{ data: [],
+        backgroundColor: ['#a78bfa','#60a5fa','#fbbf24','#34d399','#94a3b8','#f87171'],
+        borderWidth: 1, borderColor: '#1a1d23' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { position: 'right',
+        labels: { color: tickColor, font: { size: 10 }, padding: 8 } } }
+    }
+  });
+
+  // Ports bar
+  portsChart = new Chart(document.getElementById('portsChart'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{ label: 'connections', data: [],
+        backgroundColor: '#6366f1', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 9 } } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmtBytes(n) {
+  if (!n) return '0 B';
+  const units = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(1)} ${units[i]}`;
+}
+
+function timeStr(ts) {
+  if (!ts) return '';
+  return ts.substring(11, 19); // HH:MM:SS
+}
+
+function protoClass(p) {
+  const m = { TCP:'proto-tcp', UDP:'proto-udp', ICMP:'proto-icmp', DNS:'proto-dns' };
+  return m[p] || 'proto-other';
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function portDisplay(ip, port, name) {
+  let s = escHtml(ip);
+  if (port) {
+    s += `<span class="text-muted">:</span><strong>${port}</strong>`;
+    if (name) s += ` <span class="port-label">${escHtml(name)}</span>`;
+  }
+  return s;
+}
+
+function dateTimeStr(ts) {
+  if (!ts) return '—';
+  return ts.replace('T', ' ').substring(0, 19);
+}
+
+function pills(items) {
+  if (!items || !items.length) return '<span class="text-muted">—</span>';
+  return items.map(i => `<span class="mini-pill">${escHtml(String(i))}</span>`).join('');
+}
+
+function apiUrl(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}target=${encodeURIComponent(TARGET_IP)}`;
+}
+
+function targetUrl(ip) {
+  return `/?target=${encodeURIComponent(ip)}`;
+}
+
+async function selectTarget(ip, openTab=false) {
+  if (openTab) {
+    window.open(targetUrl(ip), '_blank', 'noopener');
+    return;
+  }
+  TARGET_IP = ip;
+  const url = new URL(window.location.href);
+  url.searchParams.set('target', ip);
+  window.history.pushState({}, '', url);
+  document.title = `LAN Monitor — ${ip}`;
+  setText('target-ip-badge', ip);
+  lastEventId = 0;
+
+  // Retarget the capture service
+  try {
+    const r = await fetch('/api/target/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip }),
+    });
+    const d = await r.json();
+    if (!d.ok) console.warn('retarget error:', d.stderr);
+  } catch (err) {
+    console.error('retarget failed:', err);
+  }
+
+  fetchSecuritySnapshot(false);
+  refreshAll();
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  lastEventId = 0;
+  document.getElementById('events-tbody').innerHTML =
+    '<tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>';
+  fetchEvents();
+}
+
+// ── Fetch status ─────────────────────────────────────────────────────────────
+async function fetchStatus() {
+  try {
+    const r = await fetch(apiUrl('/api/status'));
+    const d = await r.json();
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    if (d.active) {
+      dot.className  = 'status-dot live';
+      text.textContent = 'Live';
+      text.className = 'ms-2 text-success';
+    } else if (d.db_age_seconds !== undefined) {
+      dot.className  = 'status-dot stale';
+      text.textContent = `Stale (${Math.round(d.db_age_seconds)}s ago)`;
+      text.className = 'ms-2 text-warning';
+    } else {
+      dot.className  = 'status-dot offline';
+      text.textContent = d.message || 'Offline';
+      text.className = 'ms-2 text-danger';
+    }
+  } catch {}
+}
+
+// ── Fetch device identity ───────────────────────────────────────────────────
+async function fetchDevice() {
+  if (!TARGET_IP) {
+    setText('target-ip-badge', 'No Target');
+    setText('target-mac', 'No Target');
+    setText('b-identity', '—');
+    setText('b-interface', 'interface: —');
+    setText('b-last', '—');
+    return;
+  }
+  try {
+    const r = await fetch(apiUrl('/api/device'));
+    const d = await r.json();
+    const mac = d.target_mac || (d.mac_status === 'not_observed' ? 'not observed' : 'learning');
+    setText('target-mac', `MAC ${mac}`);
+    setText('target-ip-badge', d.target_ip || TARGET_IP);
+    const label = d.names?.length ? `${d.names[0]} (${d.target_ip})` : (d.target_mac || d.target_ip || TARGET_IP);
+    setText('b-identity', label);
+    setText('b-interface', `interface: ${d.interface || '—'}`);
+    setText('b-last', d.identity_note || dateTimeStr(d.last_event || d.last_seen));
+  } catch {}
+}
+
+// ── Fetch stats ───────────────────────────────────────────────────────────────
+async function fetchStats() {
+  try {
+    const r = await fetch(apiUrl('/api/stats'));
+    const d = await r.json();
+    setText('s-pkts',   d.total_packets_today?.toLocaleString() ?? '—');
+    setText('s-pkts-all', `all time: ${(d.total_packets_all ?? 0).toLocaleString()}`);
+    setText('s-out',    d.total_bytes_out_today_fmt ?? '—');
+    setText('s-out-all', `all time: ${d.total_bytes_out_all_fmt ?? '—'}`);
+    setText('s-in',     d.total_bytes_in_today_fmt ?? '—');
+    setText('s-in-all', `all time: ${d.total_bytes_in_all_fmt ?? '—'}`);
+    setText('s-ips',    d.unique_remote_ips_24h?.toLocaleString() ?? '—');
+    setText('s-alerts', d.alerts_today?.toLocaleString() ?? '—');
+    setText('s-updated', new Date().toLocaleTimeString());
+  } catch {}
+}
+
+// ── Fetch passive behavior summary ──────────────────────────────────────────
+async function fetchBehavior() {
+  try {
+    const r = await fetch(apiUrl('/api/behavior?hours=24'));
+    const d = await r.json();
+    setText('b-fanout', `${(d.remote_ips ?? 0).toLocaleString()} remote IPs`);
+    setText('b-ports', `remote ports: ${(d.remote_ports ?? 0).toLocaleString()}`);
+    if (d.busiest_hour) {
+      setText('b-hour', `${d.busiest_hour.hour}:00`);
+      setText('b-hour-sub', `packets: ${(d.busiest_hour.packets ?? 0).toLocaleString()}`);
+    } else {
+      setText('b-hour', '—');
+      setText('b-hour-sub', 'packets: —');
+    }
+  } catch {}
+}
+
+// ── Fetch LAN inventory ─────────────────────────────────────────────────────
+async function fetchLanInventory(force=false) {
+  try {
+    const now = Date.now();
+    if (!force && lastLanFetchMs && now - lastLanFetchMs < 5 * 60 * 1000) return;
+    lastLanFetchMs = now;
+    const r = await fetch(`/api/lan/inventory${force ? '?refresh=1' : ''}`);
+    const d = await r.json();
+    const rows = d.devices || [];
+    setText('lan-devices', rows.length.toLocaleString());
+    setText('lan-named', `named: ${rows.filter(x => x.names?.length).length.toLocaleString()}`);
+    setText('lan-services', rows.reduce((n, x) => n + (x.open_ports?.length || 0), 0).toLocaleString());
+    setText('lan-macs', `MACs: ${rows.filter(x => x.mac).length.toLocaleString()}`);
+    setText('lan-local', (d.observer?.ips || d.local_ips || []).join(', ') || '—');
+    setText('lan-observer-note', d.observer?.note || 'Observer IPs are excluded from target telemetry metrics.');
+    setText('lan-scope', (d.networks || []).map(n => `${n.interface} ${n.cidr}`).join(', ') || '—');
+    setText('lan-scanned', d.scanned_at ? `(scanned ${d.scanned_at.substring(11)})` : '');
+    setText('lan-note', d.limits?.note || '');
+
+    const tbody = document.getElementById('lan-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No devices discovered yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(dev => {
+      const name = dev.names?.length ? escHtml(dev.names[0]) : '<span class="text-muted">—</span>';
+      const aliases = dev.names?.length > 1
+        ? `<div class="text-muted" style="font-size:.66rem">${escHtml(dev.names.slice(1).join(', '))}</div>`
+        : '';
+      const mac = dev.mac ? `<div class="mono-small">${escHtml(dev.mac)}</div>` : '<span class="text-muted">—</span>';
+      const vendor = dev.vendor ? `<div class="text-muted" style="font-size:.66rem">${escHtml(dev.vendor)}</div>` : '';
+      const evidence = pills(dev.sources || []);
+      const state = dev.state?.length ? `<div class="text-muted" style="font-size:.66rem">${escHtml(dev.state.join(','))}</div>` : '';
+      const services = pills((dev.open_ports || []).map(p => `${p.port} ${p.service}`));
+      const active = dev.ip === TARGET_IP ? ' active' : '';
+      return `<tr>
+        <td class="mono-small">${escHtml(dev.ip)}</td>
+        <td>${name}${aliases}</td>
+        <td>${mac}${vendor}</td>
+        <td>${evidence}${state}</td>
+        <td>${services}</td>
+        <td>
+          <button class="btn btn-sm ${active ? 'btn-info' : 'btn-outline-info'} filter-btn monitor-btn" data-ip="${escHtml(dev.ip)}" onclick="selectTarget('${escHtml(dev.ip)}', false)">${active ? 'Monitoring' : 'Monitor'}</button>
+          <button class="btn btn-sm btn-outline-secondary filter-btn ms-1" onclick="selectTarget('${escHtml(dev.ip)}', true)"><i class="bi bi-box-arrow-up-right"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    console.error('lan inventory error:', err);
+  }
+}
+
+// ── Fetch target security snapshot ──────────────────────────────────────────
+async function fetchSecuritySnapshot(force=false) {
+  try {
+    const r = await fetch(apiUrl(`/api/target/security${force ? '?refresh=1' : ''}`));
+    const d = await r.json();
+    setText('sec-mode', d.mode || '—');
+    setText('sec-summary', d.stale_notice || d.summary || 'Manual, cached active check');
+    setText('sec-scanned', d.scanned_at ? `(last ${d.scanned_at})` : '');
+    setText('sec-command', d.command ? `command: ${d.command}` : 'No active command has been run yet.');
+
+    const rows = d.services || [];
+    const tbody = document.getElementById('sec-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No open services documented by snapshot</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(s => `<tr>
+      <td class="mono-small">${s.port}/${escHtml(s.protocol || 'tcp')}</td>
+      <td>${escHtml(s.state || '')}</td>
+      <td>${escHtml(s.service || '')}</td>
+      <td class="text-muted">${escHtml(s.details || '')}</td>
+    </tr>`).join('');
+  } catch (err) {
+    console.error('security snapshot error:', err);
+  }
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ── Fetch events ──────────────────────────────────────────────────────────────
+async function fetchEvents() {
+  try {
+    const alertsOnly = activeFilter === 'alerts' ? '&alerts_only=1' : '';
+    const r = await fetch(apiUrl(`/api/events?limit=100${alertsOnly}`));
+    const rows = await r.json();
+
+    // filter by direction if needed
+    const filtered = activeFilter === 'all' || activeFilter === 'alerts'
+      ? rows
+      : rows.filter(e => e.direction === activeFilter);
+
+    const tbody = document.getElementById('events-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No events</td></tr>';
+      return;
+    }
+
+    const maxId = filtered.reduce((m, e) => Math.max(m, e.id), 0);
+    const isNew = maxId > lastEventId;
+    lastEventId = maxId;
+
+    tbody.innerHTML = filtered.map((e, idx) => {
+      const dirIcon = e.direction === 'out'
+        ? `<span class="dir-out"><i class="bi bi-arrow-up-short"></i> OUT</span>`
+        : `<span class="dir-in"><i class="bi bi-arrow-down-short"></i> IN</span>`;
+      const alertCell = e.alert
+        ? `<span class="alert-badge"><i class="bi bi-exclamation-triangle me-1"></i>${escHtml(e.alert)}</span>`
+        : '';
+      const flagCell = e.flags
+        ? `<span class="flag-pill">${escHtml(e.flags)}</span>`
+        : '';
+      const rowClass = e.alert ? 'alert-row' : '';
+      const newClass = isNew && idx === 0 ? 'new-row' : '';
+      return `<tr class="${rowClass} ${newClass}">
+        <td class="text-muted">${timeStr(e.timestamp)}</td>
+        <td>${dirIcon}</td>
+        <td>${portDisplay(e.src_ip, e.src_port, e.src_port_name)}</td>
+        <td>${portDisplay(e.dst_ip, e.dst_port, e.dst_port_name)}</td>
+        <td><span class="${protoClass(e.protocol)}">${escHtml(e.protocol)}</span></td>
+        <td class="text-muted">${e.length ? fmtBytes(e.length) : '—'}</td>
+        <td>${flagCell}</td>
+        <td>${alertCell}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    console.error('events error:', err);
+  }
+}
+
+// ── Fetch top IPs ─────────────────────────────────────────────────────────────
+async function fetchTopIPs() {
+  try {
+    const r = await fetch(apiUrl('/api/top_ips?limit=15'));
+    const rows = await r.json();
+    const tbody = document.getElementById('topip-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No data</td></tr>';
+      return;
+    }
+    const maxConns = rows[0]?.connections || 1;
+    tbody.innerHTML = rows.map(ip => {
+      const pct = Math.round((ip.connections / maxConns) * 100);
+      return `<tr>
+        <td style="font-family:monospace;font-size:.75rem">${escHtml(ip.remote_ip)}</td>
+        <td>${ip.connections.toLocaleString()}</td>
+        <td class="text-success" style="font-size:.7rem">${ip.bytes_out_fmt}</td>
+        <td class="text-info"   style="font-size:.7rem">${ip.bytes_in_fmt}</td>
+        <td><div class="top-ip-bar" style="width:${pct}%"></div></td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
+
+// ── Fetch charts data ─────────────────────────────────────────────────────────
+async function fetchHourly() {
+  try {
+    const r = await fetch(apiUrl('/api/hourly?days=2'));
+    const rows = await r.json();
+    hourlyChart.data.labels           = rows.map(r => r.hour.substring(8));  // "DD HH"
+    hourlyChart.data.datasets[0].data = rows.map(r => r.bytes_out);
+    hourlyChart.data.datasets[1].data = rows.map(r => r.bytes_in);
+    hourlyChart.update('none');
+  } catch {}
+}
+
+async function fetchDaily() {
+  try {
+    const r = await fetch(apiUrl('/api/daily?days=30'));
+    const rows = await r.json();
+    dailyChart.data.labels           = rows.map(r => r.day.substring(5));
+    dailyChart.data.datasets[0].data = rows.map(r => r.bytes_out);
+    dailyChart.data.datasets[1].data = rows.map(r => r.bytes_in);
+    dailyChart.update('none');
+  } catch {}
+}
+
+async function fetchProtocols() {
+  try {
+    const r = await fetch(apiUrl('/api/protocols?hours=24'));
+    const rows = await r.json();
+    protoChart.data.labels               = rows.map(r => r.protocol);
+    protoChart.data.datasets[0].data     = rows.map(r => r.cnt);
+    protoChart.update('none');
+  } catch {}
+}
+
+async function fetchPorts() {
+  try {
+    const r = await fetch(apiUrl('/api/ports?hours=24'));
+    const rows = await r.json();
+    portsChart.data.labels           = rows.map(r => r.service ? `${r.port} (${r.service})` : `${r.port}`);
+    portsChart.data.datasets[0].data = rows.map(r => r.cnt);
+    portsChart.update('none');
+  } catch {}
+}
+
+// ── Capture service control ───────────────────────────────────────────────────
+async function fetchServiceStatus() {
+  try {
+    const [sr, tr] = await Promise.all([
+      fetch('/api/capture/service-status'),
+      fetch('/api/target/current'),
+    ]);
+    const s = await sr.json();
+    const t = await tr.json();
+    // Keep TARGET_IP in sync with what the capture service is actually targeting
+    if (TARGET_IP === null || TARGET_IP === "{{ target_ip }}") {
+      TARGET_IP = t.target || null;
+    }
+    updateCaptureButtons(s.state, t.target);
+  } catch {}
+}
+
+function updateCaptureButtons(state, captureTarget) {
+  const startBtn       = document.getElementById('capture-start-btn');
+  const stopBtn        = document.getElementById('capture-stop-btn');
+  const restartBtn     = document.getElementById('capture-restart-btn');
+  const clearTargetBtn = document.getElementById('clear-target-btn');
+  const badge          = document.getElementById('capture-svc-badge');
+  const isActive       = state === 'active';
+  const isFailed       = state === 'failed';
+  const hasTarget      = captureTarget && captureTarget !== 'none';
+
+  startBtn.style.display       = isActive ? 'none' : '';
+  stopBtn.style.display        = isActive ? '' : 'none';
+  restartBtn.style.display     = isActive ? '' : 'none';
+  clearTargetBtn.style.display = hasTarget ? '' : 'none';
+  badge.style.display          = '';
+  badge.textContent            = hasTarget ? `${state} → ${captureTarget}` : `${state} (all LAN)`;
+  badge.style.color            = isActive ? 'var(--success)' : isFailed ? 'var(--danger)' : 'var(--warning)';
+  badge.style.borderColor      = isActive ? 'var(--success)' : isFailed ? 'var(--danger)' : 'var(--warning)';
+
+  // Update Monitor button states in the LAN inventory table
+  document.querySelectorAll('.monitor-btn').forEach(btn => {
+    const ip = btn.dataset.ip;
+    const active = hasTarget && ip === captureTarget;
+    btn.classList.toggle('btn-info', active);
+    btn.classList.toggle('btn-outline-info', !active);
+    btn.textContent = active ? 'Monitoring' : 'Monitor';
+  });
+}
+
+async function clearTarget() {
+  document.getElementById('clear-target-btn').disabled = true;
+  try {
+    await fetch('/api/target/clear', { method: 'POST' });
+    TARGET_IP = null;
+    fetchDevice(); // immediately clear IP/MAC in topbar
+    setTimeout(fetchServiceStatus, 1500);
+  } finally {
+    setTimeout(() => { document.getElementById('clear-target-btn').disabled = false; }, 2000);
+  }
+}
+
+async function captureControl(action) {
+  const btnId = action === 'start' ? 'capture-start-btn'
+              : action === 'stop'  ? 'capture-stop-btn'
+              :                      'capture-restart-btn';
+  const btn = document.getElementById(btnId);
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    const r = await fetch('/api/capture/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const d = await r.json();
+    if (!d.ok) console.warn('capture control error:', d.stderr);
+    // Poll until state settles
+    let tries = 0;
+    const poll = setInterval(async () => {
+      await fetchServiceStatus();
+      if (++tries >= 6) clearInterval(poll);
+    }, 800);
+  } catch (err) {
+    console.error('captureControl error:', err);
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 1500);
+  }
+}
+
+// ── Refresh cycle ─────────────────────────────────────────────────────────────
+function refreshAll() {
+  fetchServiceStatus();
+  fetchStatus();
+  fetchDevice();
+  fetchStats();
+  fetchBehavior();
+  fetchLanInventory();
+  fetchEvents();
+  fetchTopIPs();
+  fetchHourly();
+  fetchDaily();
+  fetchProtocols();
+  fetchPorts();
+}
+
+function startCountdown() {
+  const el = document.getElementById('countdown');
+  countdown = 5;
+  el.textContent = countdown;
+  const t = setInterval(() => {
+    if (paused) return;
+    countdown--;
+    el.textContent = countdown;
+    if (countdown <= 0) {
+      refreshAll();
+      countdown = 5;
+      el.textContent = countdown;
+    }
+  }, 1000);
+}
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+  paused = !paused;
+  const btn = document.getElementById('pause-btn');
+  btn.innerHTML = paused
+    ? '<i class="bi bi-play-fill"></i>'
+    : '<i class="bi bi-pause-fill"></i>';
+  btn.classList.toggle('btn-outline-warning', paused);
+  btn.classList.toggle('btn-outline-secondary', !paused);
+});
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  refreshAll();
+  fetchSecuritySnapshot(false);
+  startCountdown();
+});
+</script>
+</body>
+</html>
